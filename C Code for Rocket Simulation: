@@ -1,0 +1,125 @@
+#include <stdio.h>
+#include <math.h>
+#include <stdlib.h>
+
+// Constants
+#define GRAVITY 9.81 // m/s^2 (acceleration due to gravity)
+#define AIR_DENSITY 1.225 // kg/m^3 (at sea level, standard conditions)
+#define DRAG_COEFFICIENT 0.5 // Simplified drag coefficient
+#define ROCKET_RADIUS 0.5 // meters
+#define ROCKET_AREAS (M_PI * pow(ROCKET_RADIUS, 2)) // cross-sectional area in m^2
+#define INITIAL_MASS 2000 // kg (rocket + fuel)
+#define FUEL_BURN_RATE 5.0 // kg/s
+#define THRUST 30000 // Newtons (N)
+#define BURN_TIME 100 // seconds, duration of fuel burn
+
+// Rocket structure
+typedef struct Rocket {
+    double mass;           // mass of the rocket (kg)
+    double velocity;       // velocity of the rocket (m/s)
+    double position;       // position of the rocket (m)
+    double fuelMass;       // mass of fuel remaining (kg)
+    double time;           // time elapsed (seconds)
+    double altitude;       // altitude of the rocket
+} Rocket;
+
+// Function prototypes
+double dragForce(double velocity);
+void updateRocket(Rocket* rocket, double dt);
+void printRocketStatus(Rocket* rocket);
+void runSimulation(Rocket* rocket, double timeStep);
+
+int main() {
+    // Initialize rocket parameters
+    Rocket rocket = {
+        .mass = INITIAL_MASS,        // Total initial mass
+        .velocity = 0.0,             // Start at rest
+        .position = 0.0,             // Start at the ground
+        .fuelMass = INITIAL_MASS - 500, // Initial fuel mass (2000 kg - 500 kg rocket mass)
+        .time = 0.0,                 // Start time
+        .altitude = 0.0              // Starting altitude
+    };
+
+    // Run the rocket simulation
+    double timeStep = 0.1; // Time step in seconds for the simulation loop
+    runSimulation(&rocket, timeStep);
+
+    return 0;
+}
+
+// Function to calculate the drag force on the rocket
+double dragForce(double velocity) {
+    return 0.5 * AIR_DENSITY * DRAG_COEFFICIENT * ROCKET_AREAS * velocity * velocity;
+}
+
+// Function to update the rocket's state (position, velocity, fuel)
+void updateRocket(Rocket* rocket, double dt) {
+    // If fuel is remaining, apply thrust and burn fuel
+    double acceleration = 0.0;
+    if (rocket->fuelMass > 0) {
+        // Calculate thrust to acceleration, subtract gravitational force and drag
+        double thrustAcceleration = THRUST / rocket->mass;
+        double gravityForce = GRAVITY * rocket->mass;
+        double drag = dragForce(rocket->velocity);
+        
+        // Net acceleration = thrust acceleration - gravitational pull - drag
+        acceleration = thrustAcceleration - gravityForce / rocket->mass - drag / rocket->mass;
+        
+        // Reduce the fuel mass
+        rocket->fuelMass -= FUEL_BURN_RATE * dt;
+        if (rocket->fuelMass < 0) rocket->fuelMass = 0;
+    } else {
+        // No fuel, only gravity and drag
+        double dragOnly = dragForce(rocket->velocity);
+        acceleration = -GRAVITY - dragOnly / rocket->mass;
+    }
+
+    // Update velocity and position using basic kinematic equations
+    rocket->velocity += acceleration * dt;
+    rocket->position += rocket->velocity * dt;
+
+    // Update the time and altitude
+    rocket->time += dt;
+    rocket->altitude = rocket->position;
+
+    // Update the rocket's total mass
+    rocket->mass = 500 + rocket->fuelMass; // 500 kg is the dry mass of the rocket
+}
+
+// Function to print the rocket's current state
+void printRocketStatus(Rocket* rocket) {
+    printf("Time: %.2f s | Altitude: %.2f m | Velocity: %.2f m/s | Fuel Remaining: %.2f kg\n",
+            rocket->time, rocket->altitude, rocket->velocity, rocket->fuelMass);
+}
+
+// Function to run the simulation
+void runSimulation(Rocket* rocket, double timeStep) {
+    // Print header
+    printf("Starting rocket simulation...\n");
+    printf("Time(s) | Altitude(m) | Velocity(m/s) | Fuel Remaining(kg)\n");
+
+    // Loop until rocket reaches space (100 km) or fuel runs out
+    while (rocket->altitude < 100000 && rocket->fuelMass > 0) {
+        updateRocket(rocket, timeStep);
+        printRocketStatus(rocket);
+
+        // Break if we reach space (100 km altitude)
+        if (rocket->altitude >= 100000) {
+            printf("\nRocket has reached space (100 km altitude)!\n");
+            break;
+        }
+        
+        // Stop if no fuel is left
+        if (rocket->fuelMass <= 0) {
+            printf("\nOut of fuel. Simulation ends.\n");
+            break;
+        }
+    }
+
+    // Final status print out
+    if (rocket->altitude < 100000) {
+        printf("\nSimulation ended due to fuel exhaustion.\n");
+    }
+    printf("Final time: %.2f s | Final altitude: %.2f m\n", rocket->time, rocket->altitude);
+}
+
